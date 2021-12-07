@@ -1,0 +1,33 @@
+{
+  "data_preprocessing": {
+    "cols_filename": "/home/ubuntu/proj/psam_pusa_colnames.csv",
+    "cols_to_drop_csv_file": "config/drop_cols.csv"
+
+  },
+  "sampling_params": {
+    "n" : 5,
+    "m" : 6,
+    "min_rows_per_strata" : 500
+  },
+  "model_params": {
+    "output_dims" : 1,
+    "learning_rate" : 1e-3,
+    "epochs" : 80,
+    "batch_size" : 128,
+    "optimizer_weight_decay": 5e-4,
+    "scheduler": {
+      "mode":"min",
+      "factor": 0.5,
+      "patience" : 3,
+      "verbose" : true,
+      "threshold" : 0.1
+    }
+  },
+  "run_workspace": "/home/ubuntu/proj/run/",
+  "data_filepath": "/home/ubuntu/proj/psam_pusa/",
+  "wandb": {
+    "project": "11785-project",
+    "entity": "shubhang"
+  }
+
+}

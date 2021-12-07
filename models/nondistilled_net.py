@@ -168,6 +168,7 @@ class LinearRegression(torch.nn.Module):
     def __init__(self, input_size, output_size):
         super(LinearRegression, self).__init__()
         self.linear = torch.nn.Linear(input_size, output_size)
+        '''
         self.layers = torch.nn.Sequential(*
                                           [torch.nn.Linear(input_size, input_size), torch.nn.BatchNorm1d(input_size),
                                            torch.nn.ReLU(), torch.nn.Dropout(p=0.5),
@@ -175,6 +176,7 @@ class LinearRegression(torch.nn.Module):
                                            torch.nn.ReLU(), torch.nn.Dropout(p=0.2),
                                            torch.nn.Linear(input_size, 10000), torch.nn.BatchNorm1d(10000),
                                            torch.nn.Linear(10000, 1)])
+                                           '''
 
         '''
         [torch.nn.Linear(input_size, 2048), torch.nn.BatchNorm1d(2048),

@@ -6,33 +6,18 @@ from datetime import datetime
 from random import sample
 import pandas as pd
 import time
-import torchdrop_cols.csv
+import torch
+# import drop_cols.csv
 import numpy as np
 import torch.utils.data as data_utils
 import os
 import wandb
 import csv
 import util.variance_decomposition
+from config import config
+from util import variance_decomposition, proj_data_utils
 
-
-def parse_data(datadir):
-    """
-    This function is used for randomly sampling 50,000 data points from a specified directory
-    :param datadir: path to directory that contains the data files
-    :return: randomly selected list of files to be loaded as datapoints
-    """
-
-    # Store the list of files to be returned
-    file_list = []
-
-    for root, directories, filenames in os.walk(datadir):  # root: median/1
-        # Randomly sample 50,000 files for training
-        files = sample(filenames, 100000)
-        for filename in files:
-            if filename.endswith('.npy'):
-                filei = os.path.join(root, filename)
-                file_list.append(filei)
-    return file_list
+config_data = config.load_config_from_file()
 
 
 def test_model(model):
@@ -163,14 +148,14 @@ def train_model(model, epoch):
     return total_loss / num_batches
 
 
-class LinearRegression(torch.nn.Module):
+class DistilledNetwork(torch.nn.Module):
     """
     This class represents the Neural network to be trained
     """
 
     def __init__(self, input_size, output_size):
-        super(LinearRegression, self).__init__()
-        self.linear = torch.nn.Linear(input_size, output_size)
+        super(DistilledNetwork, self).__init__()
+        # self.linear = torch.nn.Linear(input_size, output_size)
         self.layers = torch.nn.Sequential(*
                                           [torch.nn.Linear(input_size, input_size), torch.nn.BatchNorm1d(input_size),
                                            torch.nn.ReLU(), torch.nn.Dropout(p=0.5),
@@ -220,17 +205,56 @@ def drop_columns(encoded_df):
     return encoded_df, len(remaining_cols), remaining_cols
 
 
+def sample_data(encoded_df, remaining_cols):
+    '''
+    This method
+    '''
+
+    # calculate variance decomposition matrix of the original data
+    print('Starting variance decomposition')
+    variance_decomposition_matrix = variance_decomposition.collinear(encoded_df.drop(columns=['PINCP']).to_numpy(),
+                                                                     remaining_cols.remove('PINCP'))
+    print('Variance decomposition finished')
+
+    # variance_decomposition_matrix = np.cov(encoded_df.to_numpy().T)
+    print(variance_decomposition_matrix.shape)
+    # variance_decomposition_matrix = pd.DataFrame.cov(encoded_df).to_numpy()
+
+    print(encoded_df.describe())
+
+    n = config_data['sampling_params']['n']
+    m = config_data['sampling_params']['m']
+    min_rows_per_strata = config_data['sampling_params']['min_rows_per_strata']
+
+    # Find the most difficult to learn features and the features that are highly correlated with them
+    most_difficult_to_learn = variance_decomposition.find_difficult_to_learn(variance_decomposition_matrix, n=n, m=m)
+
+    # Get the names for the columns using their indices
+    colname = encoded_df.columns[most_difficult_to_learn]
+    print(list(colname))
+
+    # Group the data by the difficult to learn columns and sample from the new dataset. This creates stratified sampling
+    # For each group, min rows sampled is specified as 50 or else the len of the group
+    encoded_df = encoded_df.groupby(list(colname), group_keys=False).apply(
+        lambda x: x.sample(min(len(x), min_rows_per_strata)))
+
+    print(encoded_df.describe())
+    return encoded_df.__deepcopy__()
+
+
 if __name__ == '__main__':
+    run_workspace = config_data['run_workspace']
     runtime = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
-    os.mkdir('/home/ubuntu/proj/run/' + runtime)
+
+    os.mkdir(run_workspace + runtime)
     a = time.time()
     ##################################################################################################
     # Initialize Wandb
     ##################################################################################################
-    wandb.init(project="11785-project", entity="shubhang")
+    wandb.init(project=config_data['wandb']['project'], entity=config_data['wandb']['entity'])
 
-    data_filepath = '/home/ubuntu/proj/psam_pusa/'
-    filenames = parse_data(data_filepath)
+    data_filepath = config_data['data_filepath']
+    filenames = proj_data_utils.parse_data(data_filepath)
     print('filenames len is: ' + str(len(filenames)))
 
     # Combine the data
@@ -242,7 +266,7 @@ if __name__ == '__main__':
     combined_data[where_are_NaNs] = 0
 
     # Read the columns for the dataset
-    colnames_file = pd.read_csv('/home/ubuntu/proj/psam_pusa_colnames.csv')
+    colnames_file = pd.read_csv(config_data['data_preprocessing']['cols_filename'])
     colnames = list(colnames_file['0'])
 
     # Load the dataframe using np array and columns
@@ -262,38 +286,8 @@ if __name__ == '__main__':
     # train = torch.tensor(encoded_df.drop(columns=['PINCP']).values.astype(np.float32))
     # _, _, _, _ = train_test_split(train, train_target, test_size=0.1, random_state=1)
 
-    # calculate variance decomposition matrix of the original data
-    print('Starting variance decomposition')
-    variance_decomposition_matrix = variance_decomposition.collinear(encoded_df.drop(columns=['PINCP']).to_numpy(),
-                                                                     remaining_cols.remove('PINCP'))
-    print('Variance decomposition finished')
-
-    # variance_decomposition_matrix = np.cov(encoded_df.to_numpy().T)
-    print(variance_decomposition_matrix.shape)
-    # variance_decomposition_matrix = pd.DataFrame.cov(encoded_df).to_numpy()
-
-    print(encoded_df.describe())
-
-    n = 5
-    m = 6
-    min_rows_per_strata = 500
-
-    # Find the most difficult to learn features and the features that are highly correlated with them
-    most_difficult_to_learn = variance_decomposition.find_difficult_to_learn(variance_decomposition_matrix, n=n, m=m)
-
-    # Get the names for the columns using their indices
-    colname = encoded_df.columns[most_difficult_to_learn]
-    print(list(colname))
-
-    # Group the data by the difficult to learn columns and sample from the new dataset. This creates stratified sampling
-    # For each group, min rows sampled is specified as 50 or else the len of the group
-    encoded_df = encoded_df.groupby(list(colname), group_keys=False).apply(
-        lambda x: x.sample(min(len(x), min_rows_per_strata)))
-
-    print(encoded_df.describe())
-
     # Replace encoded with new samples
-    encoded_df_2 = encoded_df.__deepcopy__()
+    encoded_df_2 = sample_data(encoded_df, remaining_cols)
 
     # Create a new dataframe to store the target values
     target_df_2 = encoded_df_2.filter(['PINCP'], axis=1)
@@ -317,10 +311,10 @@ if __name__ == '__main__':
     """# Hyperparameters"""
 
     input_dims = encoded_df_2.shape[1]
-    output_dims = 1
-    learning_rate = 1e-3
-    epochs = 80
-    batch_size = 128
+    output_dims = config_data['model_params']['output_dims']
+    learning_rate = config_data['model_params']['learning_rate']
+    epochs = config_data['model_params']['epochs']
+    batch_size = config_data['model_params']['batch_size']
 
     wandb.config = {
         "learning_rate": learning_rate,
@@ -339,20 +333,26 @@ if __name__ == '__main__':
 
     """# Create model object"""
 
-    model = LinearRegression(input_dims, output_dims)
-    model.apply(LinearRegression.init_weights)
+    model = DistilledNetwork(input_dims, output_dims)
+    model.apply(DistilledNetwork.init_weights)
     model = model.to(device)
     print(model)
     """# Train the model"""
 
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=5e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True,
-                                                           threshold=0.1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=config_data['model_params']['optimizer_weight_decay'])
+
+    scheduler_mode = config_data['model_params']['scheduler']['mode']
+    scheduler_factor = config_data['model_params']['scheduler']['factor']
+    scheduler_patience = config_data['model_params']['scheduler']['patience']
+    scheduler_verbose = config_data['model_params']['scheduler']['verbose']
+    scheduler_threshold = config_data['model_params']['scheduler']['threshold']
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=scheduler_mode, factor=scheduler_factor, patience=scheduler_patience, verbose=scheduler_verbose,
+                                                           threshold=scheduler_threshold)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7, verbose=True)
 
-    train_size = int(0.7 * len(encoded_df))
-    validation_size = int(0.2 * len(encoded_df))
+    # train_size = int(0.7 * len(encoded_df))
+    # validation_size = int(0.2 * len(encoded_df))
 
     print(target_df_2.describe())
 
@@ -380,7 +380,7 @@ if __name__ == '__main__':
     ##################################################################################################
     # Train the model
     ##################################################################################################
-    os.mkdir('/home/ubuntu/proj/run/' + runtime + '/models')
+    os.mkdir(run_workspace + runtime + '/models')
     wandb.define_metric('epoch')
     wandb.define_metric('total_interval')
     wandb.define_metric('val_loss_decrease_per_epoch', step_metric='epoch')
@@ -451,6 +451,9 @@ if __name__ == '__main__':
     # test_loader = data_utils.DataLoader(dataset=test_tensor, batch_size=batch_size, shuffle=True)
 
     predictions = test_model(model)
+    n = config_data['sampling_params']['n']
+    m = config_data['sampling_params']['m']
+    min_rows_per_strata = config_data['sampling_params']['min_rows_per_strata']
     print('------------------------------------------------------------------------------------------------------')
     print('number of difficult cols to learn {}, number of related columns per difficult feature: {}'.format(n, m))
     print('min rows per strata {}  shape of encoded df {}'.format(min_rows_per_strata, encoded_df.shape))
