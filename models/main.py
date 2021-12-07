@@ -15,7 +15,7 @@ import wandb
 import csv
 import util.variance_decomposition
 from config import config
-from models.NeuralNet import NeuralNet
+from models.neuralNet import NeuralNet
 from models.distill import sample_data
 from models.regressionNet import RegressionNet
 from util import variance_decomposition, proj_data_utils
