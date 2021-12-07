@@ -15,6 +15,9 @@ import wandb
 import csv
 import util.variance_decomposition
 from config import config
+from models.NeuralNet import NeuralNet
+from models.distill import sample_data
+from models.regressionNet import RegressionNet
 from util import variance_decomposition, proj_data_utils
 
 config_data = config.load_config_from_file()
@@ -148,46 +151,6 @@ def train_model(model, epoch):
     return total_loss / num_batches
 
 
-class DistilledNetwork(torch.nn.Module):
-    """
-    This class represents the Neural network to be trained
-    """
-
-    def __init__(self, input_size, output_size):
-        super(DistilledNetwork, self).__init__()
-        # self.linear = torch.nn.Linear(input_size, output_size)
-        self.layers = torch.nn.Sequential(*
-                                          [torch.nn.Linear(input_size, input_size), torch.nn.BatchNorm1d(input_size),
-                                           torch.nn.ReLU(), torch.nn.Dropout(p=0.5),
-                                           torch.nn.Linear(input_size, input_size), torch.nn.BatchNorm1d(input_size),
-                                           torch.nn.ReLU(), torch.nn.Dropout(p=0.2),
-                                           torch.nn.Linear(input_size, 10000), torch.nn.BatchNorm1d(10000),
-                                           torch.nn.Linear(10000, 1)])
-
-        '''
-        [torch.nn.Linear(input_size, 2048), torch.nn.BatchNorm1d(2048),
-         torch.nn.ReLU(),
-         torch.nn.Linear(2048, 2048), torch.nn.BatchNorm1d(2048), torch.nn.ReLU(),
-         torch.nn.Linear(2048, 1024), torch.nn.BatchNorm1d(1024),
-         torch.nn.Dropout(p=0.3), torch.nn.ReLU(),
-         torch.nn.Linear(1024, 1024), torch.nn.BatchNorm1d(1024), torch.nn.ReLU(),
-         torch.nn.Linear(1024, 1024), torch.nn.BatchNorm1d(1024),
-         # torch.nn.Dropout(p=0.1), torch.nn.ReLU(),
-         torch.nn.Linear(1024, 512), torch.nn.BatchNorm1d(512),
-         # torch.nn.Dropout(p=0.05), torch.nn.ReLU(),
-         torch.nn.Linear(512, 256), torch.nn.BatchNorm1d(256), torch.nn.ReLU(),
-         torch.nn.Linear(256, 128), torch.nn.Linear(128, 1),
-         torch.nn.Flatten()]
-        '''
-
-    def forward(self, x):
-        return self.layers(x)
-
-    def init_weights(m):
-        if isinstance(m, torch.nn.Linear):
-            torch.nn.init.kaiming_normal_(m.weight)
-
-
 def drop_columns(encoded_df):
     """
     This function reads a file called 'drop_cols' and drops the specified columns from the dataframe
@@ -203,43 +166,6 @@ def drop_columns(encoded_df):
     remaining_cols = [x for x in colnames if x not in dropped_cols]
     print('Remaining cols: ', len(remaining_cols))
     return encoded_df, len(remaining_cols), remaining_cols
-
-
-def sample_data(encoded_df, remaining_cols):
-    '''
-    This method
-    '''
-
-    # calculate variance decomposition matrix of the original data
-    print('Starting variance decomposition')
-    variance_decomposition_matrix = variance_decomposition.collinear(encoded_df.drop(columns=['PINCP']).to_numpy(),
-                                                                     remaining_cols.remove('PINCP'))
-    print('Variance decomposition finished')
-
-    # variance_decomposition_matrix = np.cov(encoded_df.to_numpy().T)
-    print(variance_decomposition_matrix.shape)
-    # variance_decomposition_matrix = pd.DataFrame.cov(encoded_df).to_numpy()
-
-    print(encoded_df.describe())
-
-    n = config_data['sampling_params']['n']
-    m = config_data['sampling_params']['m']
-    min_rows_per_strata = config_data['sampling_params']['min_rows_per_strata']
-
-    # Find the most difficult to learn features and the features that are highly correlated with them
-    most_difficult_to_learn = variance_decomposition.find_difficult_to_learn(variance_decomposition_matrix, n=n, m=m)
-
-    # Get the names for the columns using their indices
-    colname = encoded_df.columns[most_difficult_to_learn]
-    print(list(colname))
-
-    # Group the data by the difficult to learn columns and sample from the new dataset. This creates stratified sampling
-    # For each group, min rows sampled is specified as 50 or else the len of the group
-    encoded_df = encoded_df.groupby(list(colname), group_keys=False).apply(
-        lambda x: x.sample(min(len(x), min_rows_per_strata)))
-
-    print(encoded_df.describe())
-    return encoded_df.__deepcopy__()
 
 
 if __name__ == '__main__':
@@ -286,8 +212,11 @@ if __name__ == '__main__':
     # train = torch.tensor(encoded_df.drop(columns=['PINCP']).values.astype(np.float32))
     # _, _, _, _ = train_test_split(train, train_target, test_size=0.1, random_state=1)
 
-    # Replace encoded with new samples
-    encoded_df_2 = sample_data(encoded_df, remaining_cols)
+    # Replace encoded with new samples if data distillation is true
+    if config_data['sampling_params']['distillation']:
+        encoded_df_2 = sample_data(encoded_df, remaining_cols, config_data)
+    else:
+        encoded_df_2 = encoded_df
 
     # Create a new dataframe to store the target values
     target_df_2 = encoded_df_2.filter(['PINCP'], axis=1)
@@ -332,22 +261,28 @@ if __name__ == '__main__':
     # !nvidia-smi
 
     """# Create model object"""
+    if config_data['model']['type'] == 'ols':
+        model = RegressionNet(input_dims, output_dims)
+        model.apply(RegressionNet.init_weights)
+    else:
+        model = NeuralNet(input_dims, output_dims)
+        model.apply(NeuralNet.init_weights)
 
-    model = DistilledNetwork(input_dims, output_dims)
-    model.apply(DistilledNetwork.init_weights)
     model = model.to(device)
     print(model)
     """# Train the model"""
 
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=config_data['model_params']['optimizer_weight_decay'])
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,
+                                 weight_decay=config_data['model_params']['optimizer_weight_decay'])
 
     scheduler_mode = config_data['model_params']['scheduler']['mode']
     scheduler_factor = config_data['model_params']['scheduler']['factor']
     scheduler_patience = config_data['model_params']['scheduler']['patience']
     scheduler_verbose = config_data['model_params']['scheduler']['verbose']
     scheduler_threshold = config_data['model_params']['scheduler']['threshold']
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=scheduler_mode, factor=scheduler_factor, patience=scheduler_patience, verbose=scheduler_verbose,
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=scheduler_mode, factor=scheduler_factor,
+                                                           patience=scheduler_patience, verbose=scheduler_verbose,
                                                            threshold=scheduler_threshold)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7, verbose=True)
 

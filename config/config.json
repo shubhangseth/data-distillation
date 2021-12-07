@@ -7,7 +7,8 @@
   "sampling_params": {
     "n" : 5,
     "m" : 6,
-    "min_rows_per_strata" : 500
+    "min_rows_per_strata" : 500,
+    "distillation": false
   },
   "model_params": {
     "output_dims" : 1,
@@ -21,7 +22,8 @@
       "patience" : 3,
       "verbose" : true,
       "threshold" : 0.1
-    }
+    },
+    "type": "ols"
   },
   "run_workspace": "/home/ubuntu/proj/run/",
   "data_filepath": "/home/ubuntu/proj/psam_pusa/",
