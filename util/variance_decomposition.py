@@ -4,6 +4,9 @@ import os
 import pandas as pd
 from random import sample
 import csv
+from config import config
+
+config_data = config.load_config_from_file()
 
 
 def parse_data(datadir):
@@ -86,7 +89,7 @@ def find_difficult_to_learn(variance_matrix, n=1, m=2):
 
 
 if __name__ == '__main__':
-    data_filepath = '/home/ubuntu/proj/psam_pusa/'
+    data_filepath = config_data['data_filepath']
     filenames = parse_data(data_filepath)
     print('filenames len is: ' + str(len(filenames)))
     # print(filenames)
@@ -97,11 +100,11 @@ if __name__ == '__main__':
     where_are_NaNs = np.isnan(combined_data)
     combined_data[where_are_NaNs] = 0
 
-    colnames_file = pd.read_csv('/home/ubuntu/proj/psam_pusa_colnames.csv')
+    colnames_file = pd.read_csv(config_data['data_preprocessing']['cols_filename'])
     colnames = list(colnames_file['0'])
     encoded_df = pd.DataFrame(combined_data, columns=colnames)
 
-    file = open("drop_cols.csv", "r")
+    file = open(config_data['data_preprocessing']['cols_to_drop_csv_file'], "r")
     csv_reader = csv.reader(file)
     dropped_cols = [row for row in csv_reader][0] + ['SSP', 'PINCP']
     # print(dropped_cols[0])
