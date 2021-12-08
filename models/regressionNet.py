@@ -11,7 +11,7 @@ class RegressionNet(torch.nn.Module):
         self.linear = torch.nn.Linear(input_size, output_size)
 
     def forward(self, x):
-        return self.layers(x)
+        return self.linear(x)
 
     def init_weights(m):
         if isinstance(m, torch.nn.Linear):

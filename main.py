@@ -45,7 +45,7 @@ def test_model(model):
     # Compute R2 score for the predictions and write it to a file
     r2 = r2_score(test_target.tolist(), predictions)
     print('R2 Score: {}'.format(r2))
-    with open("/home/ubuntu/proj/run/{}/r2.txt".format(runtime), "a") as fin:
+    with open(run_workspace+"{}/r2.txt".format(runtime), "a") as fin:
         fin.write(str(r2))
 
     return predictions
@@ -78,7 +78,7 @@ def validate_model(model, epoch):
 
         if batch_num % 10 == 9:
             print('Epoch: {}\tBatch: {}\tAvg-Loss validation: {:.8f}'.format(epoch, batch_num + 1, avg_loss / 10))
-            with open("/home/ubuntu/proj/run/{}/avg_val_loss.txt".format(runtime), "a") as fin:
+            with open(run_workspace+"{}/avg_val_loss.txt".format(runtime), "a") as fin:
                 fin.write(str(batch_num) + ":" + str(
                     avg_loss) + '\n')
 
@@ -124,7 +124,7 @@ def train_model(model, epoch):
             print('NANNANANANANANNANANANA')
             torch.save({
                 "x": x
-            }, "/home/ubuntu/proj/run/{}/bad_input_{}.txt".format(runtime, epoch))
+            }, run_workspace+"{}/bad_input_{}.txt".format(runtime, epoch))
             # with open("/home/ubuntu/proj/run/{}/bad_input_{}.txt".format(runtime, epoch), "a") as fin:
             #     fin.write(x)
             break
@@ -139,7 +139,7 @@ def train_model(model, epoch):
         if batch_num % 10 == 9:
             print('Epoch: {}\tBatch: {}\tAvg-Loss: {:.8f}'.format(epoch, batch_num + 1, avg_loss / 10))
             train_avg_loss_list.append(avg_loss)
-            with open("/home/ubuntu/proj/run/{}/avg_train_loss.txt".format(runtime), "a") as fin:
+            with open(run_workspace+"{}/avg_train_loss.txt".format(runtime), "a") as fin:
                 fin.write(str(batch_num) + ":" + str(
                     avg_loss) + '\n')
             avg_loss = 0.0
@@ -157,7 +157,7 @@ def drop_columns(encoded_df):
     :param encoded_df: Original dataframe
     :return: Dataframe without columns, length of remaining columns, List of remaining columns
     """
-    file = open("drop_cols.csv", "r")
+    file = open(config_data['data_preprocessing']['cols_to_drop_csv_file'], "r")
     csv_reader = csv.reader(file)
     dropped_cols = [row for row in csv_reader][0]
     # print(dropped_cols[0])
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     # !nvidia-smi
 
     """# Create model object"""
-    if config_data['model']['type'] == 'ols':
+    if config_data['model_params']['type'] == 'ols':
         model = RegressionNet(input_dims, output_dims)
         model.apply(RegressionNet.init_weights)
     else:
@@ -342,7 +342,7 @@ if __name__ == '__main__':
             # scheduler.step()
 
         if val_loss < best_loss:
-            PATH = '/home/ubuntu/proj/run/{}/models/'.format(runtime) + 'model.pt'
+            PATH = run_workspace+'{}/models/'.format(runtime) + 'model.pt'
             torch.save({
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict()

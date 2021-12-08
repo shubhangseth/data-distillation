@@ -17,7 +17,7 @@ def parse_data(datadir):
 
     for root, directories, filenames in os.walk(datadir):  # root: median/1
         # Randomly sample 50,000 files for training
-        files = sample(filenames, 100000)
+        files = sample(filenames, config_data['model_params']['data_size'])
         for filename in files:
             if filename.endswith('.npy'):
                 filei = os.path.join(root, filename)

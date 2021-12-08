@@ -23,7 +23,8 @@
       "verbose" : true,
       "threshold" : 0.1
     },
-    "type": "ols"
+    "type": "NeuralNet",
+    "data_size": 100000
   },
   "run_workspace": "/home/ubuntu/proj/run/",
   "data_filepath": "/home/ubuntu/proj/psam_pusa/",
