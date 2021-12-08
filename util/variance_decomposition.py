@@ -4,6 +4,11 @@ import os
 import pandas as pd
 from random import sample
 import csv
+import os
+import sys
+
+cwd = os.getcwd()
+sys.path.append(cwd)
 from config import config
 
 config_data = config.load_config_from_file()
