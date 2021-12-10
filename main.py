@@ -119,16 +119,6 @@ def train_model(model, epoch):
         wandb.log({"batch_train_loss": loss,
                    'train_batch_num': train_batch_num})
 
-        # If the output starts giving nan at any point, stop training
-        if torch.isnan(outputs).any().item() == True:
-            print('NANNANANANANANNANANANA')
-            torch.save({
-                "x": x
-            }, run_workspace+"{}/bad_input_{}.txt".format(runtime, epoch))
-            # with open("/home/ubuntu/proj/run/{}/bad_input_{}.txt".format(runtime, epoch), "a") as fin:
-            #     fin.write(x)
-            break
-
         optimizer.step()
 
         avg_loss += loss.item()
@@ -169,6 +159,8 @@ def drop_columns(encoded_df):
 
 
 if __name__ == '__main__':
+    print('Running program......')
+
     run_workspace = config_data['run_workspace']
     runtime = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
 
@@ -206,11 +198,6 @@ if __name__ == '__main__':
     print(encoded_df_memory)
     print('*' * 150)
     wandb.log({'encoded_df_memory': encoded_df_memory})
-
-    # # Split test cases before doing distillation to get real accuracy
-    # train_target = torch.tensor(target_df['LOG_PINCP'].values.astype(np.float32))
-    # train = torch.tensor(encoded_df.drop(columns=['PINCP']).values.astype(np.float32))
-    # _, _, _, _ = train_test_split(train, train_target, test_size=0.1, random_state=1)
 
     # Replace encoded with new samples if data distillation is true
     if config_data['sampling_params']['distillation']:
@@ -361,10 +348,6 @@ if __name__ == '__main__':
                    'train_loss_decrease_per_time': train_loss_decrease_per_time,
                    'epoch': epoch,
                    'total_interval': total_interval})
-        # print('val loss decrease per epoch {}'.format(val_loss_decrease_per_epoch))
-        # print('val loss decrease per time {}'.format(val_loss_decrease_per_time))
-        # print('train loss decrease per epoch {}'.format(train_loss_decrease_per_epoch))
-        # print('train loss decrease per time {}'.format(train_loss_decrease_per_time))
     ##################################################################################################
     # Test the model on test dataset and get R2
     ##################################################################################################
@@ -382,8 +365,6 @@ if __name__ == '__main__':
     test_input = torch.tensor(test_df.values.astype(np.float32))
 
     test, _, test_target, _ = train_test_split(test_input, test_labels, test_size=0.9, random_state=1)
-    # test_tensor = data_utils.TensorDataset(test, test_target)
-    # test_loader = data_utils.DataLoader(dataset=test_tensor, batch_size=batch_size, shuffle=True)
 
     predictions = test_model(model)
     n = config_data['sampling_params']['n']
