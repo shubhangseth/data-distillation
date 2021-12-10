@@ -98,7 +98,7 @@ To alter any parameters of the running of the project, changes have to be made t
   * ```drop_cols.csv```: csv file that houses the columns to be dropped during data preprocessing
 * ```/models```: contains different model files
   * ```regressionNet.py```: Implements ordinary least squares regression using pytorch
-  * ```neuralNet.py```: Implements a neural network of the architecture given below
+  * ```neuralNet.py```: Implements a neural network of the architecture given below</br>
   ![alt-text](https://github.com/shubhangseth/data-distillation/blob/main/model.png)
   * ```distill.py```: Implements sampling algorithm using stratified clustering
 * ```/util```: Contains python script that are necessary implementation of stratified clustering
