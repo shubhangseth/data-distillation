@@ -1,4 +1,5 @@
 # Data Distillation using Variance Decomposition and Condition Indices 
+Link: https://bit.ly/3oBRM3z
 
 With the abundance of data available today we are looking for efficient ways to use optimum data that would be required to train models and deploy it on edge devices. In this project we explore one method for distilling data using Variance Decomposition and Condition indices to reduce the original dataset by 50-60% while maintaining performance across various metrics. 
 
